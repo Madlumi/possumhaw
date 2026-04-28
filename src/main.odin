@@ -5,11 +5,6 @@ import "core:fmt"
 import "core:math/rand"
 import ray "vendor:raylib"
 
-Peg :: struct {
-   pos: [2]i32,
-   rad: i32,
-   	col: ray.Color,
-}
 
 pegs : []Peg;
 
@@ -20,12 +15,20 @@ H :: 400;
 gs :: 10.0;
 grav :: 9.81;
 
-Ball   :: struct {
+Circle :: struct {
    pos: [2]f64,
-   vel: [2]f64,
    rad: i32,
-   alive: bool,
    col: ray.Color,
+}
+
+Peg :: struct {
+   alive: bool = true,
+   using c: Circle,
+}
+Ball   :: struct {
+   using c: Circle,
+   vel: [2]f64,
+   alive: bool,
    
 }
 Turret :: struct  {
@@ -67,10 +70,13 @@ rend :: proc(){
 		ray.ClearBackground(ray.RAYWHITE)
 		ray.DrawText("HEWWO", 10, 10, 38, ray.PINK)
  ray.DrawCircle(tur.pos.x, tur.pos.y ,32, ray.PURPLE,);
-	   for i in 0..<len(pegs) { ray.DrawCircle(pegs[i].pos.x, pegs[i].pos.y, f32(pegs[i].rad), pegs[i].col,);};
+	   for i in 0..<len(pegs) {  if(!pegs[i].alive){continue;} ray.DrawCircle(pegs[i].pos.x, pegs[i].pos.y, f32(pegs[i].rad), pegs[i].col,);};
 	   for i in 0..<len(balls) { if(!balls[i].alive){continue;} ray.DrawCircle(i32(balls[i].pos.x), i32(balls[i].pos.y), f32(balls[i].rad), balls[i].col,);};
 		ray.EndDrawing()
 
+}
+
+col::proc(a Circle, b Circle) bool{
 }
 
 tick :: proc(dt: f64){
@@ -79,6 +85,10 @@ tick :: proc(dt: f64){
       balls[i].vel.y+=grav;
       balls[i].pos+=balls[i].vel*dt; 
       if(balls[i].pos.y>H+50){balls[i].alive=false;};
+      //check collisons
+      for i in 0..<len(pegs) {  if(!pegs[i].alive){continue;} 
+         if(col(balls[i],pegs[i])){pegs[i].alive=false;}
+      }
    }
 }
 main :: proc(){
