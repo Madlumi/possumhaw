@@ -2,11 +2,9 @@
 package main
 
 import "core:fmt"
-import "core:strings"
 import "core:math/rand"
 import "core:math"
 import ray "vendor:raylib"
-
 
 pathWosh:: "res/wosh.wav"
 playerWosh: ray.Sound
@@ -14,7 +12,16 @@ pingPath :: "res/ping.wav"
 ping: ray.Sound
 
 vol : f32 = .7;
-pegs : []Peg;
+
+MaxPegs :: 512;
+MaxBalls :: 64;
+
+pegs : [MaxPegs]Peg;
+pegN : int;
+
+balls : [MaxBalls]Ball;
+ballN : int;
+
 maxBalls : i32 : 9;
 ballC : i32;
 fail : bool;
@@ -49,7 +56,6 @@ Turret :: struct  {
    pos: [2]i32,
 }
 tur: Turret = Turret{pos = {10, 200}}
-balls : [dynamic]Ball;
 
 mpos: [2]i32;
 pewPow : = 200.0;
@@ -107,18 +113,22 @@ pew :: proc(){
    b.col = ray.BLACK;
    b.dead = false;
 
-   append(&balls, b);
+   if(ballN >= MaxBalls){ return; }
+   balls[ballN] = b;
+   ballN += 1;
 }
 
 
 newLevel :: proc(){
-   delete(balls);
+   ballN = 0;
    ballC=maxBalls;
    level= level+1;
-   delete(pegs);
-   balls = make([dynamic]Ball);
-   pegs = make([]Peg, level*10);
-   	for i in 0..<len(pegs) {
+
+   pegN = int(level*10);
+   if(pegN > MaxPegs){ pegN = MaxPegs; }
+
+   	for i in 0..<pegN {
+      pegs[i].dead = false;
 		pegs[i].pos.x = rand.float64_range(200, 500)
 		pegs[i].pos.y = rand.float64_range(50, 350)
       pegs[i].rad = rand.float32_range(4, 32)
@@ -140,17 +150,17 @@ rend :: proc(){
 
       ray.DrawCircle(tur.pos.x, tur.pos.y ,32, ray.PURPLE,);
 
-	   for i in 0..<len(pegs) {  if(pegs[i].rad<0){continue;} ray.DrawCircle(i32(pegs[i].pos.x), i32(pegs[i].pos.y), f32(pegs[i].rad), pegs[i].col,);};
-	   for i in 0..<len(balls) { if(balls[i].dead){continue;} ray.DrawCircle(i32(balls[i].pos.x), i32(balls[i].pos.y), f32(balls[i].rad), balls[i].col,);};
+	   for i in 0..<pegN {  if(pegs[i].rad<0){continue;} ray.DrawCircle(i32(pegs[i].pos.x), i32(pegs[i].pos.y), f32(pegs[i].rad), pegs[i].col,);};
+	   for i in 0..<ballN { if(balls[i].dead){continue;} ray.DrawCircle(i32(balls[i].pos.x), i32(balls[i].pos.y), f32(balls[i].rad), balls[i].col,);};
       drawPath()
       if(!fail){
-         //ui, balls
-         os, _ := strings.repeat("o", int(ballC)); defer delete(os)
-            ray.DrawText( fmt.ctprintf("=> %s", os), 10, 10, 38, ray.PURPLE)
-            //ui, level
-            ray.DrawText( fmt.ctprintf("Lvl: %d", level), 10, 10+40, 38, ray.PURPLE)
+         ray.DrawText("=>", 10, 10, 38, ray.PURPLE)
+         for i in 0..<int(ballC) {
+            ray.DrawText("o", i32(60 + i*22), 10, 38, ray.PURPLE)
+         }
+         ray.DrawText(ray.TextFormat("Lvl: %d", level), 10, 10+40, 38, ray.PURPLE)
       }else{
-         ray.DrawText( fmt.ctprintf("SCORE: %d", level), 50, 150, 72, ray.PURPLE)
+         ray.DrawText(ray.TextFormat("SCORE: %d", level), 50, 150, 72, ray.PURPLE)
       }
 		ray.EndDrawing()
 
@@ -188,11 +198,11 @@ bounceAtAngle :: proc(v: [2]f64, ang: f64, eff: f64) -> [2]f64 {
 }
 
 noBalls :: proc() -> bool{
-   for j in 0..<len(balls) { if(!balls[j].dead){ return false; } }
+   for j in 0..<ballN { if(!balls[j].dead){ return false; } }
    return true;
 }
 noPegs :: proc() -> bool{
-   for j in 0..<len(pegs) {  if(!pegs[j].dead){return false;} }
+   for j in 0..<pegN {  if(!pegs[j].dead){return false;} }
    return true;
 }
 dtAc : f64 ;
@@ -203,11 +213,11 @@ tick :: proc(dt: f64){
    for ; dtAc > ps; dtAc -= ps {
    
 
-   for j in 0..<len(pegs) { if(pegs[j].dead){ pegs[j].rad-=f32(ps)*.5 ; pegs[j].rad*=.99; } }
+   for j in 0..<pegN { if(pegs[j].dead){ pegs[j].rad-=f32(ps)*.5 ; pegs[j].rad*=.99; } }
       mp := ray.GetMousePosition()
       mpos.x = i32(mp.x)
       mpos.y = i32(mp.y)
-      for i in 0..<len(balls) { if(balls[i].dead){continue;} 
+      for i in 0..<ballN { if(balls[i].dead){continue;} 
          balls[i].vel.y+=grav*ps;
          balls[i].pos+=balls[i].vel*ps; 
          //dead ball
@@ -226,7 +236,7 @@ tick :: proc(dt: f64){
             hitt=false;
                }
          }
-         for j in 0..<len(pegs) {  if(pegs[j].dead){continue;} 
+         for j in 0..<pegN {  if(pegs[j].dead){continue;} 
             hit, ang := col(balls[i], pegs[j])  
             if(hit){ 
                pegs[j].dead = true;
@@ -252,23 +262,27 @@ tick :: proc(dt: f64){
 
    }
 }
+
 main :: proc(){
    fmt.println("Hewwo Woray.\n");
-   ray.InitWindow(W ,H , "HEWWO!!!!");
+   ray.InitWindow(W, H, "HEWWO!!!!");
    ray.SetTargetFPS(60);
-   ray.InitAudioDevice()
-   defer ray.CloseAudioDevice()
+   ray.InitAudioDevice();
+   defer ray.CloseAudioDevice();
+
    ping = ray.LoadSound(pingPath)
    defer ray.UnloadSound(ping)
-   playerWosh= ray.LoadSound(pathWosh)
+
+   playerWosh = ray.LoadSound(pathWosh)
    defer ray.UnloadSound(playerWosh)
 
-   ray.SetSoundVolume(ping, vol)
+   ray.SetSoundVolume(ping, vol);
    defer ray.CloseWindow();
+
    init();
+
    for !ray.WindowShouldClose() {
       tick(1.0/60.0 * gs);
       rend();
    }
-
 }

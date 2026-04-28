@@ -1,0 +1,73 @@
+
+<!doctype html>
+<html>
+<head>
+   <meta charset="utf-8">
+   <title>Possumhaw</title>
+
+   <style>
+      html, body {
+         margin: 0;
+         padding: 0;
+         width: 100%;
+         height: 100%;
+         background: #000;
+         overflow: hidden;
+      }
+
+      canvas {
+         display: block;
+         margin: auto;
+         background: #000;
+         outline: none;
+      }
+   </style>
+</head>
+
+<body>
+   <canvas id="canvas" oncontextmenu="event.preventDefault()" tabindex="-1"></canvas>
+
+   <script src="odin.js"></script>
+   <script>
+      var wasmExports = null;
+
+      var odinMemoryInterface = new odin.WasmMemoryInterface();
+      odinMemoryInterface.setIntSize(4);
+
+      var odinImports = odin.setupDefaultImports(odinMemoryInterface);
+
+      var Module = {
+         canvas: document.getElementById("canvas"),
+
+         instantiateWasm: (imports, successCallback) => {
+            const mergedImports = {
+               ...imports,
+               ...odinImports,
+
+               env: {
+                  ...(imports.env || {}),
+                  ...(odinImports.env || {}),
+               },
+            };
+
+            return WebAssembly.instantiateStreaming(fetch("index.wasm"), mergedImports).then((output) => {
+               const e = output.instance.exports;
+
+               wasmExports = e;
+               odinMemoryInterface.setExports(e);
+               odinMemoryInterface.setMemory(e.memory);
+
+               successCallback(output.instance);
+               return e;
+            });
+         },
+
+         onRuntimeInitialized: () => {
+            wasmExports._start();
+         },
+      };
+   </script>
+
+   {{{ SCRIPT }}}
+</body>
+</html>
